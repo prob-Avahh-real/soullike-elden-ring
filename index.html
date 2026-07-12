@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Souls Ring · 褪色者</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0a08;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;
+  font-family:"PingFang SC","Microsoft YaHei",serif}
+canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%}
+#hud{position:absolute;top:0;left:0;right:0;padding:8px 12px;pointer-events:none;z-index:10}
+.bar-wrap{margin-bottom:4px}
+.bar-label{font-size:9px;color:#8a7a5a;letter-spacing:.08em;text-transform:uppercase}
+.bar-bg{height:10px;background:rgba(20,15,10,.8);border:1px solid #3a3020;border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;transition:width .12s}
+#hp-fill{background:linear-gradient(90deg,#6a1818,#c03030)}
+#stamina-fill{background:linear-gradient(90deg,#2a4020,#5a8a40)}
+#souls-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+#souls{font-size:18px;font-weight:900;color:#d4af37;text-shadow:0 0 8px rgba(212,175,55,.4)}
+#area-name{font-size:10px;color:#6a5a40;font-style:italic}
+#msg{position:absolute;top:42%;left:50%;transform:translateX(-50%);font-size:clamp(14px,4vw,22px);
+  color:#d4af37;text-shadow:0 2px 12px #000;pointer-events:none;z-index:12;opacity:0;transition:opacity .3s;
+  text-align:center;white-space:pre-line}
+#msg.show{opacity:1}
+#controls{position:absolute;inset:0;z-index:15;pointer-events:none}
+#joystick-zone{position:absolute;left:16px;bottom:20px;width:120px;height:120px;pointer-events:auto}
+#joystick-base{position:absolute;inset:0;border-radius:50%;background:rgba(30,22,14,.55);
+  border:2px solid rgba(201,162,39,.35)}
+#joystick-stick{position:absolute;width:48px;height:48px;left:50%;top:50%;transform:translate(-50%,-50%);
+  border-radius:50%;background:rgba(201,162,39,.5);border:2px solid #c9a227}
+#btn-group{position:absolute;right:14px;bottom:18px;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
+.action-btn{width:62px;height:62px;border-radius:50%;border:2px solid rgba(201,162,39,.6);
+  background:rgba(20,14,8,.75);color:#d4af37;font-size:11px;font-weight:700;display:flex;
+  align-items:center;justify-content:center;cursor:pointer}
+.action-btn:active{transform:scale(.92);background:rgba(60,45,20,.85)}
+.action-btn.locked{background:rgba(40,30,15,.9);border-color:#e8c040;box-shadow:0 0 12px rgba(232,192,64,.5)}
+#start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;z-index:30;background:radial-gradient(ellipse at center,#1a1410 0%,#0d0a08 70%);
+  color:#c9a227}
+#start h1{font-size:clamp(26px,7vw,48px);font-weight:900;letter-spacing:.12em;
+  background:linear-gradient(180deg,#f0d060,#c9a227,#8a6a20);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+#start .sub{font-size:12px;color:#6a5a40;margin-bottom:18px;font-style:italic}
+#start button{background:linear-gradient(135deg,#3a2a10,#1a1408);border:2px solid #c9a227;color:#d4af37;
+  font-size:17px;font-weight:700;padding:12px 36px;border-radius:4px;cursor:pointer;letter-spacing:.1em}
+#start button:active{transform:scale(.96)}
+#start .hint{font-size:10px;color:#5a4a30;margin-top:14px;line-height:1.6;text-align:center;max-width:320px}
+#death-screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;z-index:28;background:rgba(5,2,0,.88);color:#8a2020}
+#death-screen.show{display:flex}
+#death-screen h2{font-size:clamp(32px,9vw,56px);font-weight:900;color:#6a1010;
+  text-shadow:0 0 30px rgba(120,20,20,.6);letter-spacing:.2em}
+#death-screen p{font-size:13px;color:#5a3030;margin-top:8px}
+#ring-status{position:fixed;top:2.2rem;right:.5rem;font-size:.6rem;padding:.15rem .4rem;border-radius:2rem;
+  z-index:50;display:none;background:#1a1410;color:#6a5a40;border:1px solid #3a3020}
+#ring-status.active{display:flex;align-items:center;gap:.2rem;background:#1a2a1a;color:#8ab060;border:1px solid #5a8a40}
+#cane-status{position:fixed;top:3.8rem;right:.5rem;font-size:.6rem;padding:.15rem .4rem;border-radius:2rem;
+  z-index:50;display:none;background:#1a1410;color:#6a5a40;border:1px solid #3a3020}
+#cane-status.active{display:flex;align-items:center;gap:.2rem;background:#2a1a10;color:#c08440;border:1px solid #a06030}
+@media(max-width:400px){
+  #joystick-zone{width:100px;height:100px;left:10px;bottom:14px}
+  #joystick-stick{width:40px;height:40px}
+  .action-btn{width:54px;height:54px;font-size:10px}
+  #souls{font-size:15px}
+}
+@media(max-width:280px),(max-height:300px){
+  html{font-size:9px}.bar-label{font-size:7px}.bar-bg{height:7px}
+  #souls{font-size:12px}#area-name{font-size:8px}
+  #start h1{font-size:18px}#start .sub{font-size:9px}#start button{font-size:12px;padding:8px 22px}
+  #start .hint{font-size:8px}
+  #joystick-zone{width:72px;height:72px;left:6px;bottom:8px}
+  #joystick-stick{width:30px;height:30px}
+  .action-btn{width:42px;height:42px;font-size:8px}
+  #btn-group{right:8px;bottom:10px;gap:6px}
+  #death-screen h2{font-size:22px}#death-screen p{font-size:10px}
+}
+</style>
+</head>
+<body>
+<div id="start">
+  <h1>SOULS RING</h1>
+  <p class="sub">褪色者的试炼之地</p>
+  <button onclick="startGame()">踏入交界地</button>
+  <p class="hint">左摇杆移动 · 攻击/闪避/锁定<br>篝火休息回血 · 死亡掉落卢恩可拾回<br>💍戒指倾斜移动/攻击 · 🦯手杖挥动/敲击</p>
+</div>
+<div id="death-screen"><h2>YOU DIED</h2><p id="death-sub">卢恩已遗落…</p></div>
+<div id="hud" style="display:none">
+  <div class="bar-wrap"><div class="bar-label">生命</div><div class="bar-bg"><div class="bar-fill" id="hp-fill" style="width:100%"></div></div></div>
+  <div class="bar-wrap"><div class="bar-label">精力</div><div class="bar-bg"><div class="bar-fill" id="stamina-fill" style="width:100%"></div></div></div>
+  <div id="souls-row"><div id="souls">🜔 0</div><div id="area-name">交界地 · 褪色者墓地</div></div>
+</div>
+<div id="msg"></div>
+<div id="ring-status"></div>
+<div id="cane-status"></div>
+<div id="controls" style="display:none">
+  <div id="joystick-zone"><div id="joystick-base"></div><div id="joystick-stick"></div></div>
+  <div id="btn-group">
+    <button class="action-btn" id="btn-lock">锁定</button>
+    <button class="action-btn" id="btn-attack">攻击</button>
+    <button class="action-btn" id="btn-dodge">闪避</button>
+  </div>
+</div>
+<canvas id="game"></canvas>
+
+<script>
+// ==================== CONSTANTS ====================
+const TAU = Math.PI * 2;
+const PLAYER_SPEED = 140;
+const PLAYER_RADIUS = 14;
+const DODGE_SPEED = 320;
+const DODGE_COST = 28;
+const DODGE_IFRAMES = 0.45;
+const DODGE_DURATION = 0.35;
+const ATTACK_COST = 18;
+const ATTACK_WINDUP = 0.18;
+const ATTACK_ACTIVE = 0.12;
+const ATTACK_RECOVERY = 0.28;
+const ATTACK_RANGE = 42;
+const ATTACK_ARC = Math.PI * 0.75;
+const ATTACK_DAMAGE = 28;
+const STAMINA_REGEN = 42;
+const STAMINA_REGEN_DELAY = 0.6;
+const LOCK_RANGE = 180;
+const BONFIRE_HEAL = true;
+
+const COLORS = {
+  ground: '#14100c', groundAlt: '#1a1510', wall: '#2a2218', wallEdge: '#4a3a28',
+  bonfire: '#e8a030', bonfireGlow: 'rgba(232,160,48,.35)', gold: '#d4af37',
+  player: '#8a9ab0', playerCape: '#4a3050', enemy: '#6a3030', enemyKnight: '#3a4050',
+  souls: '#d4af37', blood: '#8a1818', telegraph: 'rgba(200,60,40,.35)', hit: '#f0c040'
+};
+
+// ==================== WORLD ====================
+const walls = [
+  {x:0,y:0,w:900,h:40},{x:0,y:0,w:40,h:700},{x:860,y:0,w:40,h:700},{x:0,y:660,w:900,h:40},
+  {x:200,y:120,w:500,h:30},{x:200,y:500,w:500,h:30},{x:350,y:250,w:30,h:200},{x:520,y:250,w:30,h:200},
+  {x:80,y:280,w:80,h:30},{x:740,y:380,w:80,h:30}
+];
+const bonfire = { x: 120, y: 580, r: 22, lit: true };
+let enemies = [];
+let soulDrops = [];
+let particles = [];
+let gameState = 'menu';
+let msgTimer = 0;
+
+function initEnemies() {
+  enemies = [
+    makeEnemy('soldier', 620, 200, { hp: 80, speed: 70, souls: 120, aggro: 160, windup: 0.7, cooldown: 1.4, damage: 18, radius: 16 }),
+    makeEnemy('knight', 700, 480, { hp: 140, speed: 55, souls: 250, aggro: 200, windup: 1.0, cooldown: 2.0, damage: 32, radius: 20, combo: 2 })
+  ];
+}
+
+function makeEnemy(type, x, y, stats) {
+  return { type, x, y, homeX: x, homeY: y, angle: 0, state: 'idle', stateT: 0,
+    attackPhase: 0, comboLeft: 0, telegraph: false, dead: false, respawn: true, ...stats,
+    maxHp: stats.hp };
+}
+
+// ==================== PLAYER ====================
+const player = {
+  x: 120, y: 520, angle: 0, hp: 100, maxHp: 100, stamina: 100, maxStamina: 100,
+  souls: 0, state: 'idle', stateT: 0, iframe: 0, staminaDelay: 0,
+  lockOn: null, checkpoint: { x: 120, y: 520 }
+};
+
+// ==================== INPUT ====================
+const input = { moveX: 0, moveY: 0, attack: false, dodge: false, lockToggle: false };
+let joyActive = false, joyOrigin = { x: 0, y: 0 }, joyVec = { x: 0, y: 0 };
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H, cam = { x: 0, y: 0 }, animId = null, lastTime = 0;
+
+function resize() {
+  canvas.width = W = window.innerWidth;
+  canvas.height = H = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function setupTouch() {
+  const zone = document.getElementById('joystick-zone');
+  const stick = document.getElementById('joystick-stick');
+  const maxR = 36;
+
+  function joyMove(cx, cy) {
+    let dx = cx - joyOrigin.x, dy = cy - joyOrigin.y;
+    const len = Math.hypot(dx, dy);
+    if (len > maxR) { dx = dx / len * maxR; dy = dy / len * maxR; }
+    stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    joyVec.x = dx / maxR; joyVec.y = dy / maxR;
+    input.moveX = joyVec.x; input.moveY = joyVec.y;
+  }
+
+  zone.addEventListener('touchstart', e => {
+    e.preventDefault(); joyActive = true;
+    const t = e.changedTouches[0], r = zone.getBoundingClientRect();
+    joyOrigin = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    joyMove(t.clientX, t.clientY);
+  }, { passive: false });
+  zone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!joyActive) return;
+    joyMove(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  }, { passive: false });
+  function joyEnd() {
+    joyActive = false; joyVec = { x: 0, y: 0 };
+    input.moveX = 0; input.moveY = 0;
+    stick.style.transform = 'translate(-50%,-50%)';
+  }
+  zone.addEventListener('touchend', joyEnd);
+  zone.addEventListener('touchcancel', joyEnd);
+
+  document.getElementById('btn-attack').addEventListener('touchstart', e => { e.preventDefault(); input.attack = true; }, { passive: false });
+  document.getElementById('btn-dodge').addEventListener('touchstart', e => { e.preventDefault(); input.dodge = true; }, { passive: false });
+  document.getElementById('btn-lock').addEventListener('touchstart', e => { e.preventDefault(); input.lockToggle = true; }, { passive: false });
+
+  // Keyboard fallback for desktop testing
+  const keys = {};
+  window.addEventListener('keydown', e => { keys[e.code] = true; updateKeys(); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; updateKeys(); });
+  function updateKeys() {
+    if (gameState !== 'playing') return;
+    input.moveX = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+    input.moveY = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
+    if (keys.Space) input.attack = true;
+    if (keys.ShiftLeft || keys.ShiftRight) input.dodge = true;
+    if (keys.KeyQ) input.lockToggle = true;
+  }
+}
+setupTouch();
+
+// ==================== COLLISION ====================
+function circleRect(cx, cy, cr, rx, ry, rw, rh) {
+  const nx = Math.max(rx, Math.min(cx, rx + rw));
+  const ny = Math.max(ry, Math.min(cy, ry + rh));
+  const dx = cx - nx, dy = cy - ny;
+  return dx * dx + dy * dy < cr * cr;
+}
+
+function canMove(x, y, r) {
+  for (const w of walls) if (circleRect(x, y, r, w.x, w.y, w.w, w.h)) return false;
+  return true;
+}
+
+function moveEntity(ent, dx, dy, r) {
+  if (canMove(ent.x + dx, ent.y, r)) ent.x += dx;
+  if (canMove(ent.x, ent.y + dy, r)) ent.y += dy;
+}
+
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+function angleTo(from, to) { return Math.atan2(to.y - from.y, to.x - from.x); }
+
+function normalizeAngle(a) {
+  while (a > Math.PI) a -= TAU;
+  while (a < -Math.PI) a += TAU;
+  return a;
+}
+
+function inAttackArc(attacker, target, range, arc) {
+  const d = dist(attacker, target);
+  if (d > range + (target.radius || PLAYER_RADIUS)) return false;
+  const a = angleTo(attacker, target);
+  const diff = Math.abs(normalizeAngle(a - attacker.angle));
+  return diff < arc / 2;
+}
+
+// ==================== GAME ACTIONS ====================
+function showMsg(text, dur = 2) {
+  const el = document.getElementById('msg');
+  el.textContent = text; el.classList.add('show');
+  msgTimer = dur;
+}
+
+function spendStamina(amount) {
+  if (player.stamina < amount) return false;
+  player.stamina -= amount;
+  player.staminaDelay = STAMINA_REGEN_DELAY;
+  return true;
+}
+
+function tryAttack() {
+  if (player.state !== 'idle' || !spendStamina(ATTACK_COST)) return;
+  player.state = 'attacking';
+  player.stateT = 0;
+  if (player.lockOn && !player.lockOn.dead) player.angle = angleTo(player, player.lockOn);
+  else if (Math.hypot(input.moveX, input.moveY) > 0.1) player.angle = Math.atan2(input.moveY, input.moveX);
+}
+
+function tryDodge() {
+  if (player.state === 'dodging' || player.state === 'attacking' || !spendStamina(DODGE_COST)) return;
+  player.state = 'dodging';
+  player.stateT = 0;
+  player.iframe = DODGE_IFRAMES;
+  let dx = input.moveX, dy = input.moveY;
+  if (player.lockOn && !player.lockOn.dead && Math.hypot(dx, dy) < 0.1) {
+    const away = angleTo(player.lockOn, player);
+    dx = Math.cos(away); dy = Math.sin(away);
+  }
+  if (Math.hypot(dx, dy) < 0.1) { dx = -Math.cos(player.angle); dy = -Math.sin(player.angle); }
+  const len = Math.hypot(dx, dy) || 1;
+  player.dodgeVX = dx / len * DODGE_SPEED;
+  player.dodgeVY = dy / len * DODGE_SPEED;
+}
+
+function toggleLockOn() {
+  if (player.lockOn && !player.lockOn.dead) { player.lockOn = null; updateLockBtn(); return; }
+  let best = null, bestD = LOCK_RANGE;
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const d = dist(player, e);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  player.lockOn = best;
+  updateLockBtn();
+  if (best) showMsg('锁定: ' + (best.type === 'knight' ? '骑士' : '士兵'), 1);
+}
+
+function updateLockBtn() {
+  const btn = document.getElementById('btn-lock');
+  if (player.lockOn && !player.lockOn.dead) btn.classList.add('locked');
+  else btn.classList.remove('locked');
+}
+
+function restAtBonfire() {
+  if (dist(player, bonfire) > bonfire.r + 30) return;
+  player.hp = player.maxHp;
+  player.stamina = player.maxStamina;
+  player.checkpoint = { x: bonfire.x, y: bonfire.y - 30 };
+  for (const e of enemies) if (e.respawn && e.dead) {
+    e.dead = false; e.hp = e.maxHp; e.x = e.homeX; e.y = e.homeY;
+    e.state = 'idle'; e.stateT = 0; e.telegraph = false;
+  }
+  showMsg('篝火休息\n生命与精力已恢复', 2.5);
+  spawnParticles(bonfire.x, bonfire.y, COLORS.bonfire, 12);
+}
+
+function dropSouls(x, y, amount) {
+  if (amount <= 0) return;
+  soulDrops.push({ x, y, amount, r: 14, pulse: 0 });
+}
+
+function collectSouls() {
+  for (let i = soulDrops.length - 1; i >= 0; i--) {
+    const s = soulDrops[i];
+    if (dist(player, s) < s.r + PLAYER_RADIUS + 8) {
+      player.souls += s.amount;
+      spawnParticles(s.x, s.y, COLORS.souls, 6);
+      soulDrops.splice(i, 1);
+      showMsg('+' + s.amount + ' 卢恩', 1);
+    }
+  }
+}
+
+function damagePlayer(amount) {
+  if (player.iframe > 0 || player.state === 'dead') return;
+  player.hp -= amount;
+  player.staminaDelay = STAMINA_REGEN_DELAY;
+  spawnParticles(player.x, player.y, COLORS.blood, 8);
+  if (player.hp <= 0) playerDie();
+}
+
+function playerDie() {
+  player.state = 'dead';
+  player.hp = 0;
+  const lost = player.souls;
+  player.souls = 0;
+  dropSouls(player.x, player.y, lost);
+  document.getElementById('death-screen').classList.add('show');
+  document.getElementById('death-sub').textContent = lost > 0 ? `遗失 ${lost} 卢恩于亡身之地` : '在篝火旁复苏…';
+  setTimeout(() => {
+    player.x = player.checkpoint.x;
+    player.y = player.checkpoint.y;
+    player.hp = player.maxHp;
+    player.stamina = player.maxStamina;
+    player.state = 'idle';
+    player.iframe = 1.5;
+    player.lockOn = null;
+    updateLockBtn();
+    document.getElementById('death-screen').classList.remove('show');
+    showMsg('在篝火复苏', 2);
+  }, 2200);
+}
+
+function damageEnemy(e, amount) {
+  if (e.dead) return;
+  e.hp -= amount;
+  spawnParticles(e.x, e.y, COLORS.hit, 5);
+  if (e.hp <= 0) {
+    e.dead = true;
+    e.state = 'dead';
+    player.souls += e.souls;
+    showMsg((e.type === 'knight' ? '骑士' : '士兵') + ' 已击败\n+' + e.souls + ' 卢恩', 1.5);
+    if (player.lockOn === e) { player.lockOn = null; updateLockBtn(); }
+  }
+}
+
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, sp = 40 + Math.random() * 80;
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.4 + Math.random() * 0.3, color, r: 2 + Math.random() * 3 });
+  }
+}
+
+// ==================== ENEMY AI ====================
+function updateEnemy(e, dt) {
+  if (e.dead) return;
+  e.stateT += dt;
+  const d = dist(player, e);
+  const sees = d < e.aggro && player.state !== 'dead';
+
+  if (e.state === 'idle') {
+    e.telegraph = false;
+    if (sees) { e.state = 'chase'; e.stateT = 0; }
+    else if (dist(e, { x: e.homeX, y: e.homeY }) > 8) {
+      const a = angleTo(e, { x: e.homeX, y: e.homeY });
+      moveEntity(e, Math.cos(a) * e.speed * 0.4 * dt, Math.sin(a) * e.speed * 0.4 * dt, e.radius);
+      e.angle = a;
+    }
+  } else if (e.state === 'chase') {
+    if (!sees && d > e.aggro * 1.5) { e.state = 'idle'; return; }
+    if (d < e.radius + PLAYER_RADIUS + 18 && e.stateT > 0.3) {
+      e.state = 'windup'; e.stateT = 0; e.telegraph = true;
+      e.comboLeft = e.combo || 1;
+    } else {
+      const a = angleTo(e, player);
+      e.angle = a;
+      moveEntity(e, Math.cos(a) * e.speed * dt, Math.sin(a) * e.speed * dt, e.radius);
+    }
+  } else if (e.state === 'windup') {
+    e.angle = angleTo(e, player);
+    if (e.stateT >= e.windup) {
+      e.state = 'attack'; e.stateT = 0; e.telegraph = false;
+    }
+  } else if (e.state === 'attack') {
+    if (e.stateT < 0.15) {
+      const lunge = e.speed * 2.2 * dt;
+      moveEntity(e, Math.cos(e.angle) * lunge, Math.sin(e.angle) * lunge, e.radius);
+    }
+    if (e.stateT >= 0.1 && e.stateT - dt < 0.1) {
+      if (inAttackArc(e, player, e.radius + PLAYER_RADIUS + 10, Math.PI * 0.9)) damagePlayer(e.damage);
+    }
+    if (e.stateT >= 0.35) {
+      e.comboLeft--;
+      if (e.comboLeft > 0 && dist(player, e) < e.aggro) {
+        e.state = 'windup'; e.stateT = 0; e.telegraph = true; e.windup *= 0.85;
+      } else {
+        e.state = 'cooldown'; e.stateT = 0;
+      }
+    }
+  } else if (e.state === 'cooldown') {
+    if (e.stateT >= e.cooldown) { e.state = sees ? 'chase' : 'idle'; e.stateT = 0; }
+  }
+}
+
+// ==================== UPDATE ====================
+function update(dt) {
+  if (gameState !== 'playing') return;
+
+  if (msgTimer > 0) { msgTimer -= dt; if (msgTimer <= 0) document.getElementById('msg').classList.remove('show'); }
+
+  if (player.iframe > 0) player.iframe -= dt;
+  if (player.staminaDelay > 0) player.staminaDelay -= dt;
+  else if (player.stamina < player.maxStamina && player.state !== 'dodging') {
+    player.stamina = Math.min(player.maxStamina, player.stamina + STAMINA_REGEN * dt);
+  }
+
+  if (input.lockToggle) { toggleLockOn(); input.lockToggle = false; }
+  if (input.attack) { tryAttack(); input.attack = false; }
+  if (input.dodge) { tryDodge(); input.dodge = false; }
+
+  if (player.state === 'idle') {
+    let mx = input.moveX, my = input.moveY;
+    if (player.lockOn && !player.lockOn.dead) {
+      player.angle = angleTo(player, player.lockOn);
+      if (Math.hypot(mx, my) > 0.1) {
+        const la = Math.atan2(my, mx);
+        const ta = angleTo(player, player.lockOn);
+        const strafe = normalizeAngle(la - ta);
+        mx = Math.sin(strafe) * Math.hypot(mx, my);
+        my = -Math.cos(strafe) * Math.hypot(mx, my);
+      }
+    } else if (Math.hypot(mx, my) > 0.1) {
+      player.angle = Math.atan2(my, mx);
+    }
+    const spd = PLAYER_SPEED * dt;
+    moveEntity(player, mx * spd, my * spd, PLAYER_RADIUS);
+    if (dist(player, bonfire) < bonfire.r + 28 && player.state === 'idle') restAtBonfire();
+  } else if (player.state === 'attacking') {
+    player.stateT += dt;
+    if (player.stateT >= ATTACK_WINDUP && player.stateT - dt < ATTACK_WINDUP) {
+      for (const e of enemies) {
+        if (!e.dead && inAttackArc(player, e, ATTACK_RANGE, ATTACK_ARC)) damageEnemy(e, ATTACK_DAMAGE);
+      }
+      spawnParticles(player.x + Math.cos(player.angle) * 20, player.y + Math.sin(player.angle) * 20, COLORS.gold, 4);
+    }
+    if (player.stateT >= ATTACK_WINDUP + ATTACK_ACTIVE + ATTACK_RECOVERY) {
+      player.state = 'idle'; player.stateT = 0;
+    }
+  } else if (player.state === 'dodging') {
+    player.stateT += dt;
+    moveEntity(player, player.dodgeVX * dt, player.dodgeVY * dt, PLAYER_RADIUS);
+    if (player.stateT >= DODGE_DURATION) { player.state = 'idle'; player.stateT = 0; }
+  }
+
+  for (const e of enemies) updateEnemy(e, dt);
+  collectSouls();
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 120 * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (const s of soulDrops) s.pulse += dt * 4;
+
+  cam.x += (player.x - W / 2 - cam.x) * Math.min(1, dt * 6);
+  cam.y += (player.y - H / 2 - cam.y) * Math.min(1, dt * 6);
+
+  document.getElementById('hp-fill').style.width = (player.hp / player.maxHp * 100) + '%';
+  document.getElementById('stamina-fill').style.width = (player.stamina / player.maxStamina * 100) + '%';
+  document.getElementById('souls').textContent = '🜔 ' + player.souls;
+}
+
+// ==================== RENDER ====================
+function drawGround() {
+  const ts = 40;
+  const sx = Math.floor(cam.x / ts) * ts, sy = Math.floor(cam.y / ts) * ts;
+  for (let x = sx; x < cam.x + W + ts; x += ts) {
+    for (let y = sy; y < cam.y + H + ts; y += ts) {
+      const alt = ((x / ts + y / ts) % 2 === 0);
+      ctx.fillStyle = alt ? COLORS.ground : COLORS.groundAlt;
+      ctx.fillRect(x - cam.x, y - cam.y, ts, ts);
+    }
+  }
+}
+
+function drawWalls() {
+  for (const w of walls) {
+    ctx.fillStyle = COLORS.wall;
+    ctx.fillRect(w.x - cam.x, w.y - cam.y, w.w, w.h);
+    ctx.strokeStyle = COLORS.wallEdge;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(w.x - cam.x, w.y - cam.y, w.w, w.h);
+  }
+}
+
+function drawBonfire() {
+  const bx = bonfire.x - cam.x, by = bonfire.y - cam.y;
+  const flicker = Math.sin(Date.now() * 0.008) * 4;
+  const grd = ctx.createRadialGradient(bx, by, 0, bx, by, 40 + flicker);
+  grd.addColorStop(0, COLORS.bonfireGlow);
+  grd.addColorStop(1, 'transparent');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(bx, by, 40 + flicker, 0, TAU); ctx.fill();
+  ctx.fillStyle = COLORS.bonfire;
+  ctx.beginPath();
+  ctx.moveTo(bx, by - 16); ctx.lineTo(bx + 8, by + 6); ctx.lineTo(bx - 8, by + 6);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#f0d060';
+  ctx.beginPath(); ctx.arc(bx, by - 4, 5, 0, TAU); ctx.fill();
+  if (dist(player, bonfire) < 60) {
+    ctx.fillStyle = 'rgba(212,175,55,.7)'; ctx.font = '11px serif';
+    ctx.textAlign = 'center'; ctx.fillText('🔥 篝火', bx, by - 28);
+  }
+}
+
+function drawEntity(x, y, angle, radius, fill, cape) {
+  const sx = x - cam.x, sy = y - cam.y;
+  ctx.save(); ctx.translate(sx, sy); ctx.rotate(angle);
+  if (cape) { ctx.fillStyle = cape; ctx.beginPath(); ctx.arc(-4, 0, radius * 0.9, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = fill;
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.15)';
+  ctx.beginPath(); ctx.arc(radius * 0.3, -radius * 0.2, radius * 0.35, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemy(e) {
+  if (e.dead) return;
+  const col = e.type === 'knight' ? COLORS.enemyKnight : COLORS.enemy;
+  drawEntity(e.x, e.y, e.angle, e.radius, col, '#2a1818');
+  if (e.telegraph) {
+    const sx = e.x - cam.x, sy = e.y - cam.y;
+    ctx.fillStyle = COLORS.telegraph;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.arc(sx, sy, e.radius + 30, e.angle - 0.6, e.angle + 0.6);
+    ctx.closePath(); ctx.fill();
+  }
+  const sx = e.x - cam.x, sy = e.y - cam.y - e.radius - 10;
+  ctx.fillStyle = '#1a1010'; ctx.fillRect(sx - 16, sy, 32, 4);
+  ctx.fillStyle = '#8a2020'; ctx.fillRect(sx - 16, sy, 32 * (e.hp / e.maxHp), 4);
+}
+
+function drawPlayer() {
+  if (player.state === 'dead') return;
+  if (player.iframe > 0 && Math.floor(Date.now() / 80) % 2 === 0) ctx.globalAlpha = 0.45;
+  drawEntity(player.x, player.y, player.angle, PLAYER_RADIUS, COLORS.player, COLORS.playerCape);
+  ctx.globalAlpha = 1;
+  if (player.state === 'attacking' && player.stateT >= ATTACK_WINDUP && player.stateT < ATTACK_WINDUP + ATTACK_ACTIVE) {
+    const sx = player.x - cam.x, sy = player.y - cam.y;
+    ctx.strokeStyle = COLORS.gold; ctx.lineWidth = 3; ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.arc(sx, sy, ATTACK_RANGE * 0.7, player.angle - ATTACK_ARC / 2, player.angle + ATTACK_ARC / 2);
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  if (player.lockOn && !player.lockOn.dead) {
+    const tx = player.lockOn.x - cam.x, ty = player.lockOn.y - cam.y;
+    ctx.strokeStyle = '#e8c040'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.arc(tx, ty, player.lockOn.radius + 10 + Math.sin(Date.now() * 0.01) * 3, 0, TAU);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(player.x - cam.x, player.y - cam.y);
+    ctx.lineTo(tx, ty); ctx.strokeStyle = 'rgba(232,192,64,.3)'; ctx.stroke();
+  }
+}
+
+function drawSoulDrops() {
+  for (const s of soulDrops) {
+    const sx = s.x - cam.x, sy = s.y - cam.y;
+    const pulse = Math.sin(s.pulse) * 3;
+    ctx.fillStyle = COLORS.souls; ctx.globalAlpha = 0.7 + Math.sin(s.pulse) * 0.2;
+    ctx.beginPath(); ctx.arc(sx, sy + pulse, s.r * 0.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#f0e0a0'; ctx.font = '10px serif'; ctx.textAlign = 'center';
+    ctx.fillText(s.amount, sx, sy - 12 + pulse); ctx.globalAlpha = 1;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life * 2;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x - cam.x, p.y - cam.y, p.r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawVignette() {
+  const grd = ctx.createRadialGradient(W / 2, H / 2, W * 0.2, W / 2, H / 2, W * 0.75);
+  grd.addColorStop(0, 'transparent');
+  grd.addColorStop(1, 'rgba(0,0,0,.55)');
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  drawGround(); drawWalls(); drawBonfire(); drawSoulDrops();
+  for (const e of enemies) drawEnemy(e);
+  drawPlayer(); drawParticles(); drawVignette();
+}
+
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  update(dt); render();
+  animId = requestAnimationFrame(loop);
+}
+
+function startGame() {
+  document.getElementById('start').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('controls').style.display = 'block';
+  initEnemies();
+  player.x = 120; player.y = 520; player.hp = player.maxHp;
+  player.stamina = player.maxStamina; player.souls = 0; player.state = 'idle';
+  player.lockOn = null; soulDrops = []; particles = [];
+  gameState = 'playing'; lastTime = performance.now();
+  if (animId) cancelAnimationFrame(animId);
+  loop(lastTime);
+  showMsg('击败敌人，在篝火休息', 3);
+}
+
+// ==================== SMART RING ====================
+let ringActive = false, ringFrame = 0, ringPrevBeta = null, ringPrevGamma = null;
+function setupRing() {
+  if (typeof DeviceOrientationEvent === 'undefined') return;
+  const b = document.getElementById('ring-status');
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    b.style.display = 'flex'; b.textContent = '💍 点击启用'; b.style.cursor = 'pointer';
+    b.onclick = async () => {
+      try {
+        const p = await DeviceOrientationEvent.requestPermission();
+        if (p === 'granted') {
+          ringActive = true; b.className = 'active'; b.textContent = '💍 已连接';
+          b.style.cursor = 'default'; b.onclick = null;
+          window.addEventListener('deviceorientation', handleRing);
+        }
+      } catch (e) { b.textContent = '💍 不支持'; }
+    };
+  } else {
+    ringActive = true; b.className = 'active'; b.textContent = '💍 已连接';
+    window.addEventListener('deviceorientation', handleRing);
+  }
+}
+function handleRing(e) {
+  if (!ringActive || gameState !== 'playing') return;
+  ringFrame++; if (ringFrame % 8 !== 0) return;
+  const beta = e.beta || 0, gamma = e.gamma || 0;
+  if (ringPrevBeta === null) { ringPrevBeta = beta; ringPrevGamma = gamma; return; }
+  const dBeta = Math.abs(beta - ringPrevBeta), dGamma = Math.abs(gamma - ringPrevGamma);
+  ringPrevBeta = beta; ringPrevGamma = gamma;
+  if (dBeta > 20 || dGamma > 20) { input.dodge = true; return; }
+  if (dBeta > 5 || dGamma > 5) {
+    if (gamma > 5) input.moveX = 1;
+    else if (gamma < -5) input.moveX = -1;
+    if (beta > 5) input.moveY = -1;
+    else if (beta < -5) input.moveY = 1;
+    if (beta > 8) input.attack = true;
+  }
+}
+
+// ==================== SMART CANE ====================
+let caneActive = false, caneFrame = 0, caneLastAccel = { x: 0, y: 0, z: 0 };
+function setupCane() {
+  if (typeof DeviceMotionEvent === 'undefined') return;
+  const b = document.getElementById('cane-status');
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    b.style.display = 'flex'; b.textContent = '🦯 点击启用'; b.style.cursor = 'pointer';
+    b.onclick = async () => {
+      try {
+        const p = await DeviceMotionEvent.requestPermission();
+        if (p === 'granted') {
+          caneActive = true; b.className = 'active'; b.textContent = '🦯 已连接';
+          b.style.cursor = 'default'; b.onclick = null;
+          window.addEventListener('devicemotion', handleCane);
+        }
+      } catch (e) { b.textContent = '🦯 不支持'; }
+    };
+  } else {
+    caneActive = true; b.className = 'active'; b.textContent = '🦯 已连接';
+    window.addEventListener('devicemotion', handleCane);
+  }
+}
+function handleCane(e) {
+  if (!caneActive || gameState !== 'playing') return;
+  caneFrame++; if (caneFrame % 6 !== 0) return;
+  const a = e.accelerationIncludingGravity || e.acceleration || { x: 0, y: 0, z: 0 };
+  const ax = a.x || 0, ay = a.y || 0, az = a.z || 0;
+  const dax = Math.abs(ax - caneLastAccel.x), day = Math.abs(ay - caneLastAccel.y), daz = Math.abs(az - caneLastAccel.z);
+  const swingMag = Math.sqrt(ax * ax + ay * ay) - 9.8;
+  caneLastAccel = { x: ax, y: ay, z: az };
+  if (dax > 8 || day > 8 || daz > 8) input.attack = true;
+  else if (Math.abs(swingMag) > 3) {
+    if (ax > 1) input.moveX = 1;
+    else if (ax < -1) input.moveX = -1;
+    if (ay > 1) input.moveY = 1;
+    else if (ay < -1) input.moveY = -1;
+  }
+  if (dax > 12 && day > 12) input.dodge = true;
+}
+
+setupRing(); setupCane();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "appId": "com.soullike.eldenring",
+  "appName": "Souls Ring",
+  "webDir": "www",
+  "ios": { "contentInset": "automatic" },
+  "android": { "allowMixedContent": true },
+  "plugins": {
+    "StatusBar": { "style": "DARK", "backgroundColor": "#0d0a08" }
+  }
+}
